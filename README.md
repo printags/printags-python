@@ -66,7 +66,7 @@ Each method is one operation of the OpenAPI document, under its name in snake_ca
 
 ## Errors
 
-Every error answer raises `PrintagsError` (with `status`, `code` and `body`), or one of its subclasses: `BadRequestError` (400), `AuthenticationError` (401), `PaymentRequiredError` (402), `PermissionDeniedError` (403), `NotFoundError` (404), `RateLimitError` (429, with `retry_after` in seconds) and `ServerError` (5xx).
+Every error answer raises `PrintagsError` (with `status`, `code` and `body`), or one of its subclasses: `BadRequestError` (400), `AuthenticationError` (401), `PaymentRequiredError` (402), `PermissionDeniedError` (403), `NotFoundError` (404), `RateLimitError` (429, with `retry_after` in seconds) and `ServerError` (5xx). An answer `{"success": false}` raises `PrintagsError` too, even with an HTTP 200: a file the API refused to store never comes back as if it were stored.
 
 ```python
 from printags import NotFoundError

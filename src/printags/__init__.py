@@ -36,7 +36,9 @@ class PrintagsError(Exception):
 
     def __init__(self, status: int, body: Any, retry_after: Optional[int] = None) -> None:
         # The API answers errors in two shapes: {code, message} and {error: {code, message}}.
-        detail = body.get("error") if isinstance(body, dict) and isinstance(body.get("error"), dict) else body
+        # A 200 with {success: false} carries its error the same way, sometimes as a plain string.
+        error = body.get("error") if isinstance(body, dict) else None
+        detail = error if isinstance(error, dict) else {"message": error} if isinstance(error, str) else body
         detail = detail if isinstance(detail, dict) else {}
         super().__init__(detail.get("message") or f"Printags API error {status}")
         self.status = status
@@ -141,7 +143,10 @@ class Printags:
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         response = self._send(method, path, **kwargs)
-        return response.json() if response.content else None
+        body = response.json() if response.content else None
+        if isinstance(body, dict) and body.get("success") is False:
+            raise PrintagsError(response.status_code, body)
+        return body
 
     # --- Accounts
 
@@ -210,7 +215,12 @@ class Printags:
     def upload_file(self, account_id: str, file: Union[bytes, BinaryIO], filename: str = "file") -> Dict[str, Any]:
         """Uploads an artwork (image or PDF): ``{"success": True, "files": {"file": {"id": ...}}}``. The file id goes in
         an order item's ``printingVisuals``."""
-        return self._request("POST", f"/v2/accounts/{_seg(account_id)}/files", files={"file": (filename, file)})
+        result = self._request("POST", f"/v2/accounts/{_seg(account_id)}/files", files={"file": (filename, file)})
+        # The API answers 200 even when the file was refused: the failure is inside, as {"success": false, "error": ...}.
+        entry = (result.get("files") or {}).get("file") if isinstance(result, dict) else None
+        if not isinstance(entry, dict) or entry.get("success") is False:
+            raise PrintagsError(200, entry if isinstance(entry, dict) else {"message": "The file was not stored", "body": result})
+        return result
 
     def get_file(self, account_id: str, file_id: str) -> Tuple[bytes, Optional[str]]:
         """Downloads a file: ``(data, content_type)``."""

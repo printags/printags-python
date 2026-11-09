@@ -107,6 +107,24 @@ def test_create_order_without_key_sends_no_header():
     make(handler).create_order("@me", {"isDraft": True, "shipTo": {}})
 
 
+@pytest.mark.parametrize("entry, message", [
+    ({"success": False, "error": {"code": "UPLOAD_FAILED", "message": "Storage unavailable"}}, "Storage unavailable"),
+    ({"success": False, "error": {}}, "Printags API error 200"),  # a JS Error object serializes to {}
+])
+def test_refused_upload_raises(entry, message):
+    client = make(lambda r: httpx.Response(200, json={"success": True, "files": {"file": entry}}))
+    with pytest.raises(PrintagsError) as info:
+        client.upload_file("@me", b"PNG", "front.png")
+    assert str(info.value) == message
+    assert info.value.status == 200
+
+
+def test_success_false_anywhere_raises():
+    client = make(lambda r: httpx.Response(200, json={"success": False, "error": "Order not validated"}))
+    with pytest.raises(PrintagsError, match="Order not validated"):
+        client.validate_order("@me", "o1")
+
+
 def test_upload_and_download_file():
     def handler(request):
         if request.method == "POST":
