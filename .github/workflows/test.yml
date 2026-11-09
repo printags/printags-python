@@ -9,8 +9,10 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # ubuntu-latest (26.04) has no Python 3.9 build; 22.04 has every version of the matrix.
+    runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.9", "3.13"]
     steps:
