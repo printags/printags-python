@@ -1,0 +1,42 @@
+# Publishes to PyPI when a v* tag is pushed, through Trusted Publishing (OIDC): no token is stored anywhere.
+# PyPI side: project "printags", owner "printags", repository "printags-python", workflow "publish.yml", environment "pypi".
+name: publish
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e '.[test]' build
+      - run: pytest -q
+      # The tag must match the version in src/printags/__init__.py, or the wrong version would be published.
+      - run: test "${GITHUB_REF_NAME#v}" = "$(python -c 'import printags; print(printags.__version__)')"
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/printags
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
